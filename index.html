@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS CloudFront Distribution Setup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <main class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-6 sm:p-10 lg:p-12">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-center mb-10 text-gray-900">
+            AWS CloudFront Distribution Setup
+        </h1>
+
+        <!-- Architectural Diagram -->
+        <section class="mb-10 text-center">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800">Architectural Diagram</h2>
+            <div class="flex justify-center items-center flex-col sm:flex-row">
+                <div class="flex flex-col items-center">
+                    <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="mb-2">
+                        <rect x="10" y="10" width="80" height="80" rx="10" fill="#e0f2fe" stroke="#38bdf8" stroke-width="2"/>
+                        <path d="M50 30L50 70" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M30 50L70 50" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <span class="font-semibold">User</span>
+                </div>
+                
+                <svg width="100" height="40" viewBox="0 0 100 40" class="mx-4">
+                    <defs>
+                        <marker id="arrowhead-1" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#4b5563" />
+                        </marker>
+                    </defs>
+                    <line x1="10" y1="20" x2="90" y2="20" stroke="#4b5563" stroke-width="2" marker-end="url(#arrowhead-1)" />
+                    <text x="50" y="15" text-anchor="middle" class="text-sm" fill="#4b5563">Request</text>
+                </svg>
+
+                <div class="flex flex-col items-center">
+                    <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="mb-2">
+                        <rect x="10" y="10" width="80" height="80" rx="10" fill="#fef9c3" stroke="#facc15" stroke-width="2"/>
+                        <path d="M20 50H80M20 30H80M20 70H80" stroke="#facc15" stroke-width="2" stroke-linecap="round"/>
+                        <text x="50" y="55" font-family="Inter, sans-serif" font-weight="bold" font-size="12" text-anchor="middle" fill="#854d0e">CDN</text>
+                    </svg>
+                    <span class="font-semibold">CloudFront</span>
+                </div>
+
+                <svg width="100" height="40" viewBox="0 0 100 40" class="mx-4">
+                    <defs>
+                        <marker id="arrowhead-2" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#4b5563" />
+                        </marker>
+                    </defs>
+                    <line x1="10" y1="20" x2="90" y2="20" stroke="#4b5563" stroke-width="2" marker-end="url(#arrowhead-2)" />
+                    <text x="50" y="15" text-anchor="middle" class="text-sm" fill="#4b5563">Serve/Fetch</text>
+                </svg>
+
+                <div class="flex flex-col items-center">
+                    <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="mb-2">
+                        <path d="M20 20C20 14.4772 24.4772 10 30 10H70C75.5228 10 80 14.4772 80 20V80C80 85.5228 75.5228 90 70 90H30C24.4772 90 20 85.5228 20 80V20Z" fill="#dbeafe" stroke="#60a5fa" stroke-width="2"/>
+                        <path d="M30 20H70M30 40H70M30 60H70M30 80H70" stroke="#60a5fa" stroke-width="2" stroke-linecap="round"/>
+                        <text x="50" y="55" font-family="Inter, sans-serif" font-weight="bold" font-size="12" text-anchor="middle" fill="#1e40af">S3</text>
+                    </svg>
+                    <span class="font-semibold">S3 Bucket</span>
+                </div>
+            </div>
+            <p class="mt-4 text-sm text-gray-600">This diagram illustrates the relationship between a user, the CloudFront Content Delivery Network, and your private S3 bucket.</p>
+        </section>
+
+        <!-- Step 1 -->
+        <section class="mb-10">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Step 1: Prepare Your S3 Bucket</h2>
+            <p class="mb-4 text-gray-700">The first step is to have an S3 bucket with the content you want to distribute.</p>
+            <ul class="space-y-4 text-gray-700 list-disc list-inside">
+                <li>
+                    <span class="font-semibold">Create an S3 Bucket:</span> Go to the AWS Management Console, navigate to the S3 service, and create a new bucket. Choose a globally unique name for your bucket.
+                </li>
+                <li>
+                    <span class="font-semibold">Upload Content:</span> Upload all the static content (HTML, CSS, JavaScript files, images, etc.) that you want to serve through CloudFront.
+                </li>
+                <li>
+                    <span class="font-semibold">Configure Access:</span> Ensure that "Block all public access" is enabled for the bucket. This is a critical security measure. CloudFront will be granted access to this bucket later, but the bucket itself will remain private and inaccessible directly from the public internet.
+                </li>
+            </ul>
+        </section>
+
+        <!-- Step 2 -->
+        <section class="mb-10">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Step 2: Create an Origin Access Control (OAC)</h2>
+            <p class="mb-4 text-gray-700">An OAC is a recommended feature that securely connects your CloudFront distribution to your S3 bucket.</p>
+            <ul class="space-y-4 text-gray-700 list-disc list-inside">
+                <li>
+                    <span class="font-semibold">Navigate to CloudFront:</span> In the AWS Management Console, go to the CloudFront service.
+                </li>
+                <li>
+                    <span class="font-semibold">Create an OAC:</span> In the left-hand navigation pane, under <span class="font-bold text-gray-900">Security</span>, select <span class="font-bold text-gray-900">Origin access</span>. Click <span class="font-bold text-gray-900">Create control setting</span>.
+                </li>
+                <li>
+                    <span class="font-semibold">Configure OAC:</span>
+                    <ul class="ml-6 mt-2 space-y-2 list-circle list-inside">
+                        <li><span class="font-semibold">Name:</span> Provide a descriptive name for your OAC (e.g., `my-s3-bucket-oac`).</li>
+                        <li><span class="font-semibold">Origin type:</span> Select `S3`.</li>
+                        <li>Click <span class="font-bold text-gray-900">Create</span>.</li>
+                    </ul>
+                </li>
+                <li>
+                    <span class="font-semibold">Copy the Policy:</span> After the OAC is created, CloudFront will display a bucket policy. Copy this policy to your clipboard. This policy is what grants CloudFront permission to read files from your private S3 bucket.
+                </li>
+            </ul>
+        </section>
+
+        <!-- Step 3 -->
+        <section class="mb-10">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Step 3: Create the CloudFront Distribution</h2>
+            <p class="mb-4 text-gray-700">This is where you define how CloudFront will serve your content.</p>
+            <ul class="space-y-4 text-gray-700 list-disc list-inside">
+                <li>
+                    <span class="font-semibold">Start a New Distribution:</span> In the CloudFront console, select <span class="font-bold text-gray-900">Distributions</span> from the left-hand menu, then click <span class="font-bold text-gray-900">Create distribution</span>.
+                </li>
+                <li>
+                    <span class="font-semibold">Configure Origin:</span>
+                    <ul class="ml-6 mt-2 space-y-2 list-circle list-inside">
+                        <li><span class="font-semibold">Origin domain:</span> Click in this field and select your S3 bucket from the dropdown list.</li>
+                        <li><span class="font-semibold">Name:</span> The origin ID will be automatically populated.</li>
+                        <li><span class="font-semibold">Origin access:</span> Choose <span class="font-bold text-gray-900">Origin access control settings (recommended)</span>.</li>
+                        <li><span class="font-semibold">Origin access control:</span> Select the OAC you created in the previous step.</li>
+                        <li><span class="font-semibold">Bucket policy:</span> CloudFront will prompt you to update the S3 bucket policy. Click <span class="font-bold text-gray-900">Copy policy</span> and then <span class="font-bold text-gray-900">Go to S3 bucket permissions</span>.</li>
+                        <li>Paste the copied policy into the <span class="font-bold text-gray-900">Bucket policy editor</span> in your S3 bucket's permissions section and save the changes. This completes the secure connection.</li>
+                    </ul>
+                </li>
+                <li>
+                    <span class="font-semibold">Configure Default Cache Behavior:</span>
+                    <ul class="ml-6 mt-2 space-y-2 list-circle list-inside">
+                        <li><span class="font-semibold">Viewer protocol policy:</span> Select <span class="font-bold text-gray-900">Redirect HTTP to HTTPS</span>. This is a standard security practice.</li>
+                        <li><span class="font-semibold">Allowed HTTP methods:</span> Select <span class="font-bold text-gray-900">GET, HEAD</span>. This is sufficient for static content.</li>
+                        <li><span class="font-semibold">Cache policy:</span> Choose <span class="font-bold text-gray-900">CachingOptimized</span>. This managed policy is ideal for static content and ensures optimal caching.</li>
+                    </ul>
+                </li>
+                <li>
+                    <span class="font-semibold">Configure Other Settings:</span>
+                    <ul class="ml-6 mt-2 space-y-2 list-circle list-inside">
+                        <li><span class="font-semibold">Distribution settings:</span> You can optionally add a <span class="font-bold text-gray-900">Default root object</span> (e.g., `index.html`) so that users can access your site by just typing your domain name.</li>
+                        <li><span class="font-semibold">Price class:</span> Select the price class that best suits your needs.</li>
+                        <li><span class="font-semibold">WAF (Web Application Firewall):</span> You can optionally enable WAF for an extra layer of security.</li>
+                    </ul>
+                </li>
+                <li>
+                    <span class="font-semibold">Create Distribution:</span> Click <span class="font-bold text-gray-900">Create distribution</span>.
+                </li>
+            </ul>
+        </section>
+
+        <!-- Step 4 -->
+        <section class="mb-10">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Step 4: Test Your CloudFront Distribution</h2>
+            <ul class="space-y-4 text-gray-700 list-disc list-inside">
+                <li>
+                    <span class="font-semibold">Wait for Deployment:</span> CloudFront distributions take some time to deploy. The status will show as `Deploying`.
+                </li>
+                <li>
+                    <span class="font-semibold">Get the Domain Name:</span> Once the status changes to `Deployed`, go back to the list of distributions. Copy the <span class="font-bold text-gray-900">Distribution domain name</span>. It will look like `d1234abcd.cloudfront.net`.
+                </li>
+                <li>
+                    <span class="font-semibold">Access Your Content:</span> Paste this domain name into your browser's address bar. If you configured a default root object, you'll see your website. Otherwise, append the path to one of your files (e.g., `d1234abcd.cloudfront.net/your-image.jpg`).
+                </li>
+            </ul>
+        </section>
+
+        <!-- Dataflow Map -->
+        <section class="mt-12">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800 text-center">Dataflow Map</h2>
+            <p class="mb-6 text-center text-gray-700">This map illustrates the path of a user's request, highlighting the role of CloudFront's caching mechanism.</p>
+            <div class="flex flex-col items-center">
+                <!-- Step 1 -->
+                <div class="bg-blue-100 border border-blue-400 text-blue-800 px-4 py-3 rounded-lg w-full mb-4">
+                    <span class="font-bold">1. User Request:</span> A user makes a request to your CloudFront domain (e.g., `d1234abcd.cloudfront.net`).
+                </div>
+                <!-- Arrow -->
+                <svg width="40" height="40" viewBox="0 0 40 40" class="my-2">
+                    <defs>
+                        <marker id="arrowhead-flow" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#374151" />
+                        </marker>
+                    </defs>
+                    <line x1="20" y1="5" x2="20" y2="35" stroke="#374151" stroke-width="2" marker-end="url(#arrowhead-flow)" />
+                </svg>
+                
+                <!-- Step 2 -->
+                <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded-lg w-full mb-4">
+                    <span class="font-bold">2. Cache Check:</span> CloudFront receives the request and checks its nearest Edge Location cache to see if the content is available.
+                </div>
+                <!-- Arrow -->
+                <svg width="40" height="40" viewBox="0 0 40 40" class="my-2">
+                    <defs>
+                        <marker id="arrowhead-flow-2" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#374151" />
+                        </marker>
+                    </defs>
+                    <line x1="20" y1="5" x2="20" y2="35" stroke="#374151" stroke-width="2" marker-end="url(#arrowhead-flow-2)" />
+                </svg>
+
+                <!-- Step 3 -->
+                <div class="bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-lg w-full mb-4">
+                    <span class="font-bold">3. Cache Miss (to S3):</span> If the content is not in the cache, CloudFront securely requests the content from your private S3 bucket.
+                </div>
+                <!-- Arrow -->
+                <svg width="40" height="40" viewBox="0 0 40 40" class="my-2">
+                    <defs>
+                        <marker id="arrowhead-flow-3" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#374151" />
+                        </marker>
+                    </defs>
+                    <line x1="20" y1="5" x2="20" y2="35" stroke="#374151" stroke-width="2" marker-end="url(#arrowhead-flow-3)" />
+                </svg>
+                
+                <!-- Step 4 -->
+                <div class="bg-purple-100 border border-purple-400 text-purple-800 px-4 py-3 rounded-lg w-full mb-4">
+                    <span class="font-bold">4. Content Delivery & Caching:</span> S3 sends the content to CloudFront. CloudFront caches it at the Edge Location for future requests and then delivers it to the user.
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+</body>
+</html>
